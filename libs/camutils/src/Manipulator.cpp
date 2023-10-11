@@ -318,6 +318,7 @@ template <typename FLOAT>
 void Manipulator<FLOAT>::update(FLOAT deltaTime) { }
 
 template class Manipulator<float>;
+template class Manipulator<double>;
 
 } // namespace camutils
 } // namespace filament

@@ -6,9 +6,9 @@ cmake_minimum_required(VERSION 3.19)
 # ==================================================================================================
 # Toolchain configuration
 # ==================================================================================================
-if (APPLE AND NOT IOS)
+if (APPLE)
     # This must be set before project() is called
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 12 CACHE STRING "")
 endif()
 
 # ==================================================================================================
@@ -372,7 +372,7 @@ endif()
 # On Android RELEASE builds, we disable exceptions and RTTI to save some space (about 75 KiB
 # saved by -fno-exception and 10 KiB saved by -fno-rtti).
 if (ANDROID OR IOS OR WEBGL)
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-exceptions -fno-rtti")
+#    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-exceptions -fno-rtti")
 
     if (ANDROID OR WEBGL)
         # Omitting unwind info prevents the generation of readable stack traces in crash reports on iOS
@@ -382,9 +382,9 @@ endif()
 
 # Turn off exceptions on iOS debug as well. This fixes an availability error we see when using
 # std::visit, which is not supported on iOS 11.0 when exceptions are enabled.
-if (IOS)
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-exceptions")
-endif()
+#if (IOS)
+#    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-exceptions")
+#endif()
 
 # With WebGL, we disable RTTI even for debug builds because we pass emscripten::val back and forth
 # between C++ and JavaScript in order to efficiently access typed arrays, which are unbound.
@@ -738,6 +738,11 @@ if (WEBGL)
     add_subdirectory(web/filament-js)
     add_subdirectory(web/samples)
 endif()
+    add_subdirectory(${LIBRARIES}/imageio)
+
+    add_subdirectory(${EXTERNAL}/libpng/tnt)
+    add_subdirectory(${EXTERNAL}/libz/tnt)
+    add_subdirectory(${EXTERNAL}/tinyexr/tnt)
 
 if (IS_HOST_PLATFORM)
     if (FILAMENT_SUPPORTS_OPENGL)
@@ -746,15 +751,15 @@ if (IS_HOST_PLATFORM)
     if (NOT FILAMENT_SKIP_SDL2)
       add_subdirectory(${LIBRARIES}/filamentapp)
     endif()
-    add_subdirectory(${LIBRARIES}/imageio)
+#    add_subdirectory(${LIBRARIES}/imageio)
 
     add_subdirectory(${FILAMENT}/samples)
 
     add_subdirectory(${EXTERNAL}/libassimp/tnt)
-    add_subdirectory(${EXTERNAL}/libpng/tnt)
+#    add_subdirectory(${EXTERNAL}/libpng/tnt)
     add_subdirectory(${EXTERNAL}/libsdl2/tnt)
-    add_subdirectory(${EXTERNAL}/libz/tnt)
-    add_subdirectory(${EXTERNAL}/tinyexr/tnt)
+#    add_subdirectory(${EXTERNAL}/libz/tnt)
+#    add_subdirectory(${EXTERNAL}/tinyexr/tnt)
 
     add_subdirectory(${TOOLS}/cmgen)
     add_subdirectory(${TOOLS}/cso-lut)
