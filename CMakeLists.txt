@@ -300,6 +300,8 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_STANDARD} -fstrict-aliasing -Wno-unknown-pragmas -Wno-unused-function -Wno-deprecated-declarations")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFILAMENT_SINGLE_THREADED")
+
 if (FILAMENT_USE_EXTERNAL_GLES3)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EXTERNAL_GLES3")
 endif()
@@ -392,7 +394,7 @@ endif()
 if (WEBGL)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-rtti")
 endif()
-
+set(WEBGL_PTHREADS 1)
 if (WEBGL_PTHREADS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 endif()
@@ -736,7 +738,7 @@ set(FILAMENT_SAMPLES_BINARY_DIR ${PROJECT_BINARY_DIR}/samples)
 
 if (WEBGL)
     add_subdirectory(web/filament-js)
-    add_subdirectory(web/samples)
+    #add_subdirectory(web/samples)
 endif()
     add_subdirectory(${LIBRARIES}/imageio)
 

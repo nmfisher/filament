@@ -16,14 +16,14 @@ set(CPP_SRC
 
 # The emcc options are not documented well, the best place to find them is the source:
 # https://github.com/kripken/emscripten/blob/main/src/settings.js
-
-if (WEBGL_PTHREADS)
+set(WEBGL_PTHREADS 1)
+#if (WEBGL_PTHREADS)
   set(COPTS "${COPTS} -pthread")
   set(LOPTS "${LOPTS} -pthread")
-endif()
-
+#endif()
+set(FILAMENT_SINGLE_THREADED 1)
 # The following setting is required because we disable RTTI.
-set(COPTS "${COPTS} -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0")
+set(COPTS "${COPTS} -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 -DUTILS_HAS_THREADING=0 -DFILAMENT_SINGLE_THREADED=1")
 
 # Uncomment the following line to check for leaks
 # set(LOPTS "${LOPTS} --memoryprofiler")
