@@ -165,7 +165,7 @@ if (WIN32)
     # Link statically against c/c++ lib to avoid missing redistriburable such as
     # "VCRUNTIME140.dll not found. Try reinstalling the app.", but give users
     # a choice to opt for the shared runtime if they want.
-    option(USE_STATIC_CRT "Link against the static runtime libraries." ON)
+    option(USE_STATIC_CRT "Link against the static runtime libraries." OFF)
 
     # On Windows we need to instruct cmake to generate the .def in order to get the .lib required
     # when linking against dlls. CL.EXE will not generate .lib without .def file (or without pragma
@@ -174,19 +174,19 @@ if (WIN32)
 
     # The CMAKE_CXX_FLAGS vars can be overriden by some Visual Studio generators, so we use an alternative
     # global method here:
-    if (${USE_STATIC_CRT})
-        add_compile_options(
-            $<$<CONFIG:>:/MT>
-            $<$<CONFIG:Debug>:/MTd>
-            $<$<CONFIG:Release>:/MT>
-        )
-    else()
+#    if (${USE_STATIC_CRT})
+#        add_compile_options(
+#            $<$<CONFIG:>:/MT>
+#            $<$<CONFIG:Debug>:/MTd>
+#            $<$<CONFIG:Release>:/MT>
+#        )
+#    else()
         add_compile_options(
             $<$<CONFIG:>:/MD>
             $<$<CONFIG:Debug>:/MDd>
             $<$<CONFIG:Release>:/MD>
         )
-    endif()
+#    endif()
 
     # TODO: Figure out why pdb generation messes with incremental compilaton.
     # IN RELEASE_WITH_DEBUG_INFO, generate debug info in .obj, no in pdb.

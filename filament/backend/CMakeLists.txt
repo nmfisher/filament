@@ -80,9 +80,9 @@ if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_SWIFTSHADER)
             src/opengl/OpenGLTimerQuery.cpp
             src/opengl/OpenGLTimerQuery.h
     )
-    if (EGL)
+    # if (EGL)
         list(APPEND SRCS src/opengl/platforms/PlatformEGL.cpp)
-    endif()
+    # endif()
     if (ANDROID)
         # FIXME: this should be included when we build for JAVA (which is implied by ANDROID)
         #        but is not specific to ANDROID
@@ -105,8 +105,8 @@ if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_SWIFTSHADER)
         elseif (FILAMENT_SUPPORTS_EGL_ON_LINUX)
             list(APPEND SRCS src/opengl/platforms/PlatformEGLHeadless.cpp)
         endif()
-    # elseif (WIN32)
-        # list(APPEND SRCS src/opengl/platforms/PlatformWGL.cpp)
+    #elseif (WIN32)
+    #    list(APPEND SRCS src/opengl/platforms/PlatformWGL.cpp)
     endif()
 endif()
 
@@ -214,6 +214,7 @@ endif()
 # "2" corresponds to SYSTRACE_TAG_FILEMENT (See: utils/Systrace.h)
 add_definitions(-DSYSTRACE_TAG=2 )
 
+
 # ==================================================================================================
 # Includes & target definition
 # ==================================================================================================
@@ -301,9 +302,9 @@ target_link_libraries(${TARGET} PUBLIC math)
 target_link_libraries(${TARGET} PUBLIC utils)
 
 # Android, iOS, and WebGL do not use bluegl.
-if(FILAMENT_SUPPORTS_OPENGL AND NOT IOS AND NOT ANDROID AND NOT WEBGL)
-    target_link_libraries(${TARGET} PRIVATE bluegl)
-endif()
+#if(FILAMENT_SUPPORTS_OPENGL AND NOT IOS AND NOT ANDROID AND NOT WEBGL)
+#    target_link_libraries(${TARGET} PRIVATE bluegl)
+#endif()
 
 if (FILAMENT_SUPPORTS_VULKAN)
     target_link_libraries(${TARGET} PUBLIC bluevk vkmemalloc vkshaders smol-v)
