@@ -596,8 +596,6 @@ void VulkanDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t w, uint32_t h, uint32_t depth,
         TextureUsage usage) {
-
-    utils::slog.d << "IMPORTING VULKAN TEXTURE" << utils::io::endl;
     
     FVK_SYSTRACE_SCOPE();
 
