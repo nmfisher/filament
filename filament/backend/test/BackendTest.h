@@ -70,8 +70,11 @@ protected:
 
     filament::backend::DriverApi& getDriverApi() { return *commandStream; }
     filament::backend::Driver& getDriver() { return *driver; }
+    filament::backend::Platform* getPlatform() { return platform; }
 
 private:
+
+    filament::backend::Platform* platform = nullptr;
 
     filament::backend::Driver* driver = nullptr;
     filament::backend::CommandBufferQueue commandBufferQueue;

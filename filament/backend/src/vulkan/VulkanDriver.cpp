@@ -37,6 +37,7 @@
 #include <utils/CString.h>
 #include <utils/FixedCapacityVector.h>
 #include <utils/Panic.h>
+#include <utils/Log.h>
 
 #ifndef NDEBUG
 #include <set>  // For VulkanDriver::debugCommandBegin
@@ -595,7 +596,30 @@ void VulkanDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t w, uint32_t h, uint32_t depth,
         TextureUsage usage) {
-    // not supported in this backend
+
+    utils::slog.d << "IMPORTING VULKAN TEXTURE" << utils::io::endl;
+    
+    FVK_SYSTRACE_SCOPE();
+
+    VkImage image = reinterpret_cast<VkImage>(id);
+
+    FILAMENT_CHECK_PRECONDITION(image != VK_NULL_HANDLE)
+            << "importTextureR: VkImage handle cannot be null";
+
+    VkFormat vkFormat = fvkutils::getVkFormat(format);
+    FILAMENT_CHECK_PRECONDITION(vkFormat != VK_FORMAT_UNDEFINED)
+            << "importTextureR: unsupported texture format";
+
+    auto texture = resource_ptr<VulkanTexture>::make(&mResourceManager, th,
+            mPlatform->getDevice(), mAllocator, &mResourceManager, &mCommands,
+            image, vkFormat, target, levels, samples, w, h, depth, usage, mStagePool);
+
+    VulkanCommandBuffer& commandsBuf = mCommands.get();
+    auto const& primaryViewRange = texture->getPrimaryViewRange();
+    auto const defaultLayout = texture->getDefaultLayout();
+    texture->transitionLayout(&commandsBuf, primaryViewRange, defaultLayout);
+
+    texture.inc();
 }
 
 void VulkanDriver::destroyTexture(Handle<HwTexture> th) {

@@ -67,7 +67,7 @@ BackendTest::~BackendTest() {
 
 void BackendTest::initializeDriver() {
     auto backend = static_cast<filament::backend::Backend>(sBackend);
-    Platform* platform = PlatformFactory::create(&backend);
+    platform = PlatformFactory::create(&backend);
     assert_invariant(static_cast<uint8_t>(backend) == static_cast<uint8_t>(sBackend));
     Platform::DriverConfig const driverConfig;
     driver = platform->createDriver(nullptr, driverConfig);

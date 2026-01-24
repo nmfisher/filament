@@ -186,6 +186,25 @@ VulkanTexture::VulkanTexture(VkDevice device, VmaAllocator allocator,
     mPrimaryViewRange = mState->mFullViewRange;
 }
 
+// Constructor for importing external VkImage
+VulkanTexture::VulkanTexture(VkDevice device, VmaAllocator allocator,
+        fvkmemory::ResourceManager* resourceManager, VulkanCommands* commands,
+        VkImage image, VkFormat format, SamplerType target, uint8_t levels,
+        uint8_t samples, uint32_t width, uint32_t height, uint32_t depth,
+        TextureUsage tusage, VulkanStagePool& stagePool)
+    : HwTexture(target, levels, samples, width, height, depth, TextureFormat::UNUSED, tusage),
+      mState(fvkmemory::resource_ptr<VulkanTextureState>::construct(resourceManager, device,
+              allocator, commands, stagePool, format,
+              fvkutils::getViewType(target),
+              levels,
+              getLayerCount(target, depth),
+              getDefaultLayoutImpl(tusage),
+              any(tusage & TextureUsage::PROTECTED))) {
+    mState->mTextureImage = image;
+    mState->mTextureImageMemory = VK_NULL_HANDLE;
+    mPrimaryViewRange = mState->mFullViewRange;
+}
+
 // Constructor for user facing texture
 VulkanTexture::VulkanTexture(VkDevice device, VkPhysicalDevice physicalDevice,
         VulkanContext const& context, VmaAllocator allocator,
