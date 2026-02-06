@@ -72,6 +72,7 @@ if (TNT_DEV)
             filament_framegraph_test.cpp
             filament_test.cpp
             filament_test_material.cpp
+            filament_transparent_picking_test.cpp
             ${RESGEN_SOURCE})
 
     target_link_libraries(test_${TARGET} PRIVATE filamat filament gtest)
