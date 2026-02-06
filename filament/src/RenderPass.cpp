@@ -808,6 +808,8 @@ RenderPass::Command* RenderPass::generateCommandsImpl(CommandTypeFlags extraFlag
                 *curr = cmd;
                 // cancel command if both front and back faces are culled
                 curr->key |= select(cullingMode == CullingMode::FRONT_AND_BACK);
+                // cancel command if filtering translucent objects (e.g. for non-transparent picking)
+                curr->key |= select(filterTranslucentObjects && translucent);
             }
 
             ++curr;
