@@ -163,6 +163,14 @@ struct VulkanTexture : public HwTexture, fvkmemory::Resource {
             uint8_t samples, uint32_t width, uint32_t height, uint32_t depth,
             TextureUsage tusage, VulkanStagePool& stagePool);
 
+    // Constructor for importing external VkImage.
+    // Memory ownership remains with caller - Filament won't free it.
+    VulkanTexture(VkDevice device, VmaAllocator allocator,
+            fvkmemory::ResourceManager* resourceManager, VulkanCommands* commands,
+            VkImage image, VkFormat format, SamplerType target, uint8_t levels,
+            uint8_t samples, uint32_t width, uint32_t height, uint32_t depth,
+            TextureUsage tusage, VulkanStagePool& stagePool);
+
     // Constructor for creating a texture view for wrt specific mip range
     VulkanTexture(VkDevice device, VkPhysicalDevice physicalDevice, VulkanContext const& context,
             VmaAllocator allocator, VulkanCommands* commands,

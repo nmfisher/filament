@@ -38,6 +38,7 @@
 #include <backend/platforms/VulkanPlatform.h>
 
 #include <utils/compiler.h>
+#include <utils/Log.h>
 #include <utils/CString.h>
 #include <utils/ImmutableCString.h>
 #include <utils/Panic.h>
@@ -793,8 +794,28 @@ void VulkanDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t w, uint32_t h, uint32_t depth,
         TextureUsage usage, utils::ImmutableCString&& tag) {
-    // not supported in this backend
-    assert_invariant(false && "Not supported in Vulkan backend");
+
+    FVK_SYSTRACE_SCOPE();
+
+    VkImage image = reinterpret_cast<VkImage>(id);
+
+    FILAMENT_CHECK_PRECONDITION(image != VK_NULL_HANDLE)
+            << "importTextureR: VkImage handle cannot be null";
+
+    VkFormat vkFormat = fvkutils::getVkFormat(format);
+    FILAMENT_CHECK_PRECONDITION(vkFormat != VK_FORMAT_UNDEFINED)
+            << "importTextureR: unsupported texture format";
+
+    auto texture = resource_ptr<VulkanTexture>::make(&mResourceManager, th,
+            mPlatform->getDevice(), mAllocator, &mResourceManager, &mCommands,
+            image, vkFormat, target, levels, samples, w, h, depth, usage, mStagePool);
+
+    VulkanCommandBuffer& commandsBuf = mCommands.get();
+    auto const& primaryViewRange = texture->getPrimaryViewRange();
+    auto const defaultLayout = texture->getDefaultLayout();
+    texture->transitionLayout(&commandsBuf, primaryViewRange, defaultLayout);
+
+    texture.inc();
     mResourceManager.associateHandle(th.getId(), std::move(tag));
 }
 
