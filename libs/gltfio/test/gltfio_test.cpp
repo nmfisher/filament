@@ -14,26 +14,25 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
-
-#include <backend/PixelBufferDescriptor.h>
+#include "materials/uberarchive.h"
 
 #include <filament/Engine.h>
 #include <filament/MaterialEnums.h>
 #include <filament/RenderableManager.h>
 #include <filament/TransformManager.h>
 
+#include <backend/PixelBufferDescriptor.h>
+
 #include <gltfio/AssetLoader.h>
 #include <gltfio/FilamentAsset.h>
+#include <gltfio/math.h>
 #include <gltfio/ResourceLoader.h>
 #include <gltfio/TextureProvider.h>
-#include <gltfio/math.h>
+#include <gtest/gtest.h>
 #include <math/mathfwd.h>
 #include <utils/EntityManager.h>
 #include <utils/NameComponentManager.h>
 #include <utils/Path.h>
-
-#include "materials/uberarchive.h"
 
 #include <fstream>
 #include <unordered_map>
@@ -45,6 +44,7 @@ using namespace utils;
 
 char const* ANIMATED_MORPH_CUBE_GLB = "AnimatedMorphCube.glb";
 char const* DAMAGED_HELMET_WEBP_GLB = "DamagedHelmetWebp.glb";
+char const* NON_TRIANGLE_MORPH_GLTF = "NonTriangleMorph.gltf";
 
 static std::ifstream::pos_type getFileSize(const char* filename) {
     std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
@@ -261,6 +261,32 @@ TEST_F(glTFIOTest, DamagedHelmetWebpMaterials) {
     EXPECT_TRUE(mData[DAMAGED_HELMET_WEBP_GLB]->mWebpDecoder == nullptr);
     EXPECT_EQ(mEngine->getTextureCount(), 3);    
 #endif
+}
+
+TEST_F(glTFIOTest, NonTriangleTangents) {
+    Path const gltfFile =
+            Path::getCurrentExecutable().getParent() + Path(NON_TRIANGLE_MORPH_GLTF);
+    glTFData data(gltfFile, mEngine, mMaterialProvider, mNameManager);
+    FilamentAsset const& asset = *data.getAsset();
+    Entity const* renderables = asset.getRenderableEntities();
+    auto const& renderableManager = mEngine->getRenderableManager();
+
+    ASSERT_EQ(asset.getRenderableEntityCount(), 2u);
+
+    size_t morphingRenderableCount = 0;
+    for (size_t i = 0; i < asset.getRenderableEntityCount(); ++i) {
+        auto const instance = renderableManager.getInstance(renderables[i]);
+        ASSERT_TRUE(instance);
+        ASSERT_EQ(renderableManager.getPrimitiveCount(instance), 1u);
+        EXPECT_TRUE(renderableManager.getEnabledAttributesAt(instance, 0)
+                .test(VertexAttribute::TANGENTS));
+
+        if (renderableManager.getMorphTargetCount(instance) > 0) {
+            ++morphingRenderableCount;
+            EXPECT_EQ(renderableManager.getMorphTargetCount(instance), 1u);
+        }
+    }
+    EXPECT_EQ(morphingRenderableCount, 1u);
 }
 
 int main(int argc, char** argv) {

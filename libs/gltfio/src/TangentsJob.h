@@ -15,7 +15,6 @@
  */
 
 #include <cgltf.h>
-
 #include <math/vec4.h>
 
 namespace filament {
@@ -34,6 +33,7 @@ namespace filament::gltfio {
  */
 struct TangentsJob {
     static constexpr int kMorphTargetUnused = -1;
+    static constexpr math::short4 kDefaultTangentFrame = { 0, 0, 0, 0x7fff };
 
     // The inputs to the procedure. The prim is owned by the client, which should ensure that it
     // stays alive for the duration of the procedure.
@@ -54,8 +54,8 @@ struct TangentsJob {
     // The outputs of the procedure. The results array gets malloc'd by the procedure, so clients
     // should remember to free it.
     struct OutputParams {
-        cgltf_size vertexCount;
-        math::short4* results;
+        cgltf_size vertexCount = 0;
+        math::short4* results = nullptr;
     };
 
     // Clients might want to track the jobs in an array, so the arguments are bundled into a struct.

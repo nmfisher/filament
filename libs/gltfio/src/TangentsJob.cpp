@@ -16,10 +16,10 @@
 
 #include "TangentsJob.h"
 
+#include <geometry/SurfaceOrientation.h>
+
 #include <cstdlib>
 #include <memory>
-
-#include <geometry/SurfaceOrientation.h>
 
 using namespace filament::gltfio;
 using namespace filament;
@@ -125,27 +125,35 @@ void TangentsJob::run(Params* params) {
         }
     }
 
-    const size_t triangleCount = prim.indices ? (prim.indices->count / 3) : (vertexCount / 3);
-    unpackedTriangles.reset(new uint3[triangleCount]);
+    // SurfaceOrientation only accepts triangle lists. Other primitive types can still use
+    // supplied normals and tangents, but must not reinterpret their indices as triangles.
+    bool hasTriangleTopology = false;
+    if (prim.type == cgltf_primitive_type_triangles) {
+        const size_t triangleCount = prim.indices ? (prim.indices->count / 3) : (vertexCount / 3);
+        if (triangleCount > 0) {
+            hasTriangleTopology = true;
+            unpackedTriangles.reset(new uint3[triangleCount]);
 
-    if (prim.indices) {
-        for (size_t tri = 0, j = 0; tri < triangleCount; ++tri) {
-            auto& triangle = unpackedTriangles[tri];
-            triangle.x = cgltf_accessor_read_index(prim.indices, j++);
-            triangle.y = cgltf_accessor_read_index(prim.indices, j++);
-            triangle.z = cgltf_accessor_read_index(prim.indices, j++);
-        }
-    } else {
-        for (size_t tri = 0, j = 0; tri < triangleCount; ++tri) {
-            auto& triangle = unpackedTriangles[tri];
-            triangle.x = j++;
-            triangle.y = j++;
-            triangle.z = j++;
+            if (prim.indices) {
+                for (size_t tri = 0, j = 0; tri < triangleCount; ++tri) {
+                    auto& triangle = unpackedTriangles[tri];
+                    triangle.x = cgltf_accessor_read_index(prim.indices, j++);
+                    triangle.y = cgltf_accessor_read_index(prim.indices, j++);
+                    triangle.z = cgltf_accessor_read_index(prim.indices, j++);
+                }
+            } else {
+                for (size_t tri = 0, j = 0; tri < triangleCount; ++tri) {
+                    auto& triangle = unpackedTriangles[tri];
+                    triangle.x = j++;
+                    triangle.y = j++;
+                    triangle.z = j++;
+                }
+            }
+
+            sob.triangleCount(triangleCount);
+            sob.triangles(unpackedTriangles.get());
         }
     }
-
-    sob.triangleCount(triangleCount);
-    sob.triangles(unpackedTriangles.get());
 
     auto uvInfo = baseAccessors[cgltf_attribute_type_texcoord];
     if (uvInfo && uvInfo->count == vertexCount && uvInfo->type == cgltf_type_vec2) {
@@ -156,7 +164,23 @@ void TangentsJob::run(Params* params) {
 
     // Compute surface orientation quaternions.
     params->out.results = (short4*) malloc(sizeof(short4) * vertexCount);
-    geometry::SurfaceOrientation* helper = sob.build();
-    helper->getQuats(params->out.results, vertexCount);
-    delete helper;
+    if (!params->out.results) {
+        return;
+    }
+    // SurfaceOrientation needs either normals or triangle topology. Position-only points, lines,
+    // and strips have neither, so skip the builder and use the stable fallback below.
+    std::unique_ptr<geometry::SurfaceOrientation> helper;
+    if (baseAccessors[cgltf_attribute_type_normal] || hasTriangleTopology) {
+        helper.reset(sob.build());
+    }
+    if (helper) {
+        helper->getQuats(params->out.results, vertexCount);
+        return;
+    }
+
+    // Positions alone cannot define a tangent frame for points, lines, and strips. Use a stable
+    // identity frame in that case; this decodes to normal +Z and tangent +X.
+    for (cgltf_size i = 0; i < vertexCount; ++i) {
+        params->out.results[i] = kDefaultTangentFrame;
+    }
 }

@@ -14,43 +14,38 @@
  * limitations under the License.
  */
 
-#include <gltfio/ResourceLoader.h>
-#include <gltfio/TextureProvider.h>
-
-#include "GltfEnums.h"
-#include "FFilamentAsset.h"
-#include "TangentsJob.h"
 #include "downcast.h"
+#include "FFilamentAsset.h"
+#include "GltfEnums.h"
+#include "TangentsJob.h"
 #include "Utility.h"
+
 #include "extended/ResourceLoaderExtended.h"
 
-#include <limits>
 #include <filament/BufferObject.h>
 #include <filament/Engine.h>
 #include <filament/IndexBuffer.h>
+#include <filament/MorphTargetBuffer.h>
 #include <filament/Texture.h>
 #include <filament/VertexBuffer.h>
-#include <filament/MorphTargetBuffer.h>
 
+#include <cgltf.h>
 #include <geometry/Transcoder.h>
-
+#include <gltfio/ResourceLoader.h>
+#include <gltfio/TextureProvider.h>
+#include <math/quat.h>
+#include <math/vec3.h>
+#include <math/vec4.h>
+#include <meshoptimizer.h>
 #include <private/utils/Tracing.h>
-
+#include <tsl/robin_map.h>
 #include <utils/compiler.h>
 #include <utils/JobSystem.h>
 #include <utils/Logger.h>
 #include <utils/Path.h>
 
-#include <cgltf.h>
-#include <meshoptimizer.h>
-
-#include <math/quat.h>
-#include <math/vec3.h>
-#include <math/vec4.h>
-
-#include <tsl/robin_map.h>
-
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -327,7 +322,7 @@ inline void uploadBuffers(FFilamentAsset* asset, Engine& engine,
                     // Sentinels are used for TBN (tangent, bitangent, normal) generation.
                     // Filament encodes this TBN frame as a quaternion in a SHORT4 attribute
                     // (8 bytes).
-                    elementSize = 8; // SHORT4
+                    elementSize = sizeof(short4);
                 }
 
                 const size_t size = count * elementSize;
@@ -335,15 +330,22 @@ inline void uploadBuffers(FFilamentAsset* asset, Engine& engine,
                     continue;
                 }
                 if (slot.vertexBuffer) {
-                    void* zeros = malloc(size);
-                    if (!zeros) {
-                        LOG(ERROR) << "Out of memory allocating zeroed vertex buffer.";
+                    void* contents = malloc(size);
+                    if (!contents) {
+                        LOG(ERROR) << "Out of memory allocating vertex buffer.";
                         continue;
                     }
-                    memset(zeros, 0, size);
+                    if (isSentinel) {
+                        short4* tangents = static_cast<short4*>(contents);
+                        for (size_t i = 0; i < count; ++i) {
+                            tangents[i] = TangentsJob::kDefaultTangentFrame;
+                        }
+                    } else {
+                        memset(contents, 0, size);
+                    }
                     BufferObject* bo = BufferObject::Builder().size(size).build(engine);
                     asset->mBufferObjects.push_back(bo);
-                    bo->setBuffer(engine, BufferDescriptor(zeros, size, FREE_CALLBACK));
+                    bo->setBuffer(engine, BufferDescriptor(contents, size, FREE_CALLBACK));
                     slot.vertexBuffer->setBufferObjectAt(engine, slot.bufferIndex, bo);
                     continue;
                 }
@@ -985,13 +987,12 @@ void ResourceLoader::Impl::computeTangents(FFilamentAsset* asset) {
         baseTangents[slot.vertexBuffer] = slot.bufferIndex;
     }
 
-    // Create a job description for each triangle-based primitive.
+    // Create a job description for each primitive that has a tangent slot. TangentsJob uses
+    // triangle topology when available, supplied normals and tangents for other primitive types,
+    // and a neutral tangent frame when surface orientation cannot be derived.
     using Params = TangentsJob::Params;
     std::vector<Params> jobParams;
     for (auto const& [prim, vb] : primitives) {
-        if (UTILS_UNLIKELY(prim->type != cgltf_primitive_type_triangles)) {
-            continue;
-        }
         auto iter = baseTangents.find(vb);
         if (iter != baseTangents.end()) {
             jobParams.emplace_back(Params {{ prim }, {vb, nullptr, 0, iter->second }});
@@ -1002,12 +1003,12 @@ void ResourceLoader::Impl::computeTangents(FFilamentAsset* asset) {
     for (size_t i = 0, n = asset->mSourceAsset->hierarchy->meshes_count; i < n; ++i) {
         const cgltf_mesh& mesh = asset->mSourceAsset->hierarchy->meshes[i];
         const FixedCapacityVector<Primitive>& prims = asset->mMeshCache[i];
-        if (0 == mesh.weights_count) {
-            continue;
-        }
         for (cgltf_size pindex = 0, pcount = mesh.primitives_count; pindex < pcount; ++pindex) {
             const cgltf_primitive& prim = mesh.primitives[pindex];
             MorphTargetBuffer* const tb = prims[pindex].morphTargetBuffer;
+            if (!tb) {
+                continue;
+            }
             uint32_t const morphTargetOffset = prims[pindex].morphTargetOffset;
             for (cgltf_size tindex = 0, tcount = prim.targets_count; tindex < tcount; ++tindex) {
                 const cgltf_morph_target& target = prim.targets[tindex];
@@ -1043,6 +1044,10 @@ void ResourceLoader::Impl::computeTangents(FFilamentAsset* asset) {
 
     // Finally, upload quaternions to the GPU from the main thread.
     for (Params& params : jobParams) {
+        if (!params.out.results) {
+            LOG(ERROR) << "Unable to allocate tangent data.";
+            continue;
+        }
         if (params.context.vb) {
             BufferObject* bo = BufferObject::Builder()
                     .size(params.out.vertexCount * sizeof(short4)).build(*mEngine);

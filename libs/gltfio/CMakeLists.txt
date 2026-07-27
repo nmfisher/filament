@@ -241,6 +241,7 @@ if (FILAMENT_BUILD_TESTING)
 
     add_test_gltf("third_party/models/AnimatedMorphCube/AnimatedMorphCube.glb" "AnimatedMorphCube.glb")
     add_test_gltf("third_party/models/DamagedHelmet/DamagedHelmetWebp.glb" "DamagedHelmetWebp.glb")
+    add_test_gltf("libs/gltfio/test/resources/NonTriangleMorph.gltf" "NonTriangleMorph.gltf")
 
     add_custom_target(test_gltfio_files DEPENDS ${GLTF_TEST_FILES})
 
