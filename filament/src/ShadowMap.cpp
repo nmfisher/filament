@@ -197,7 +197,7 @@ ShadowMap::ShaderParameters ShadowMap::updateDirectional(FEngine& engine,
     //
     //   In LiPSM mode, we're using the warped space here.
     float4 f = computeFocusParams(LMpMv, WLMp, lsClippedShadowVolume, vertexCount,
-            camera, params.options.shadowFar, params.options.stable);
+            camera, params.options.stable);
 
     if (params.options.stable) {
         const auto lsRef = lightData.elementAt<FScene::SHADOW_REF>(index);
@@ -611,7 +611,7 @@ float4 ShadowMap::computeFocusParams(
         mat4f const& WLMp,
         FrustumBoxIntersection const& lsShadowVolume, size_t vertexCount,
         CameraInfo const& camera,
-        float shadowFar, bool stable) noexcept {
+        bool stable) noexcept {
     float2 s, o;
     if (stable) {
         // In stable mode, the light frustum size must be fixed, so we choose the
@@ -619,22 +619,13 @@ float4 ShadowMap::computeFocusParams(
         // We simply take the view volume bounding sphere, but we calculate it
         // in view space, so that it's perfectly stable.
 
-        auto getViewVolumeBoundingSphere = [&]() {
-            if (shadowFar > 0) {
-                float4 const wsViewVolumeBoundingSphere = { camera.getPosition(), shadowFar };
-                return wsViewVolumeBoundingSphere;
-            } else {
-                mat4f const viewFromClip = inverse(camera.cullingProjection);
-                Corners const wsFrustumVertices = computeFrustumCorners(viewFromClip);
-                float4 const wsViewVolumeBoundingSphere =
-                        computeBoundingSphere(wsFrustumVertices.vertices, 8);
-                return wsViewVolumeBoundingSphere;
-            }
-        };
-
-        float4 const wsViewVolumeBoundingSphere = getViewVolumeBoundingSphere();
-        s = 1.0f / wsViewVolumeBoundingSphere.w;
-        o = mat4f::project(LMpMv * camera.model, wsViewVolumeBoundingSphere.xyz).xy;
+        // The manager has already applied shadowFar and the cascade's near/far planes to
+        // cullingProjection. Using shadowFar again would give every cascade the same coverage.
+        mat4f const viewFromClip = inverse(camera.cullingProjection);
+        Corners const vsFrustumVertices = computeFrustumCorners(viewFromClip);
+        float4 const vsBoundingSphere = computeBoundingSphere(vsFrustumVertices.vertices, 8);
+        s = 1.0f / vsBoundingSphere.w;
+        o = mat4f::project(LMpMv * camera.model, vsBoundingSphere.xyz).xy;
         o = -s * o;
     } else {
         Aabb const bounds = compute2DBounds(WLMp, lsShadowVolume.data(), vertexCount);

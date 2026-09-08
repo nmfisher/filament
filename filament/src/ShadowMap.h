@@ -264,7 +264,7 @@ private:
             math::mat4f const& WLMp,
             FrustumBoxIntersection const& lsShadowVolume, size_t vertexCount,
             CameraInfo const& camera,
-            float shadowFar, bool stable) noexcept;
+            bool stable) noexcept;
 
     static inline void snapLightFrustum(math::float2& s, math::float2& o,
             math::double2 lsRef, math::int2 resolution) noexcept;
