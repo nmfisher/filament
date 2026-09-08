@@ -624,6 +624,7 @@ if (FILAMENT_BUILD_TESTING)
             test/test_LoadImage.cpp
             test/test_StencilBuffer.cpp
             test/test_Scissor.cpp
+            test/test_ShadowTexelFootprint.cpp
             test/test_MipLevels.cpp
             test/test_Handles.cpp
             test/test_CircularBuffer.cpp
@@ -649,6 +650,7 @@ if (FILAMENT_BUILD_TESTING)
             backend
             gtest
             filamat
+            shaders
             SPIRV
             spirv-cross-glsl)
         # imageio drives the golden-image comparison and is only built for host
