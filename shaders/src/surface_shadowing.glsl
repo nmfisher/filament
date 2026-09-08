@@ -14,45 +14,27 @@
 highp vec4 computeLightSpacePosition(highp vec3 p, const highp vec3 n,
         const highp vec3 dir, const highp vec2 b, highp_mat4 lightFromWorldMatrix) {
 
-    // FIXME: it's unfortunatelly illegal to use defined(HAS_VSM_VARIANT) here because it only means
-    //   "sampler2DArray" in the STANDARD variants, it doesn't actually mean "moments".
-    //   Beause of that the normal bias calculation is performed with a bias of 0.
+    highp vec4 shadowPosition = mulMat4x4Float3(lightFromWorldMatrix, p);
+    // VSM and EVSSM pass zero bias. Avoid computing a basis for these projections.
+    if (all(equal(b, vec2(0.0)))) {
+        return shadowPosition;
+    }
 
-    // --------------------------------------------------------------------------------------
-    // Anisotropic Normal Bias for Shadow Mapping
-    // --------------------------------------------------------------------------------------
-    // To prevent shadow acne, we must push the geometry along its normal to clear the
-    // quantization steps of the shadow map's discrete depth grid. The exact physical depth
-    // error we must clear is proportional to the shadow texel's world-space dimensions.
-    //
-    // This implementation computes the exact geometric projection of the rectangular
-    // shadow map texel onto the surface normal.
-    //
-    // 1. Coordinate Space Transition:
-    //    We project the world-space normal onto the light's X and Y basis vectors (L_right,
-    //    L_up). This gives us the lateral components of the normal in Light Space (n_Lx, n_Ly).
-    //
-    // 2. The Implicit sin(theta) Slope Scale:
-    //    Because the normal is a unit vector, the magnitude of its lateral components in
-    //    light space inherently equals sin(theta), where theta is the angle of incidence.
-    //    This perfectly and automatically scales the bias from 0.0 (top-down, flat surface)
-    //    to maximum (grazing angle).
-    //
-    // 3. Exact Anisotropic Footprint (The L1 Norm):
-    //    Shadow texels are rarely perfectly square due to Cascaded Shadow Maps (CSM) or
-    //    Light Space Perspective Shadow Maps (LiSPSM). Jx and Jy are the physical world-space
-    //    dimensions of the texel.
-    //    By evaluating `abs(n_Lx * Jx) + abs(n_Ly * Jy)`, we compute the exact scalar
-    //    projection of the rectangular texel footprint.
-    //      - It is superior to `max(Jx, Jy)` which assumes a massive square and causes Peter Panning.
-    //      - It is superior to `length()` which assumes an ellipse and under-biases the corners.
-    // --------------------------------------------------------------------------------------
+    // b already contains world-space texel lengths. The projection's rows are scaled
+    // covectors, not unit light axes; using them directly makes bias depend on projection
+    // scale and atlas allocation. Remove the perspective divide's contribution first.
+    highp mat4x3 rows = mat4x3(transpose(lightFromWorldMatrix));
+    highp vec3 du = rows[0] * shadowPosition.w - rows[3] * shadowPosition.x;
+    highp vec3 dv = rows[1] * shadowPosition.w - rows[3] * shadowPosition.y;
+    highp vec3 dz = rows[2] * shadowPosition.w - rows[3] * shadowPosition.z;
 
-    // Project the world normal onto the shadow map's 2D grid
-    highp vec2 n_L = mat3x2(lightFromWorldMatrix) * n;
-
-    // Apply the anisotropic normal bias
-    p += n * (abs(n_L.x * b.x) + abs(n_L.y * b.y));
+    // Columns of the inverse projection Jacobian point along world-space texels.
+    // Their common determinant and w factors disappear on normalization. This also
+    // handles sheared LiSPSM projections, for which simply normalizing rows is incorrect.
+    highp vec3 texelU = normalize(cross(dv, dz));
+    highp vec3 texelV = normalize(cross(dz, du));
+    highp vec2 n_L = vec2(dot(n, texelU), dot(n, texelV));
+    p += n * dot(abs(n_L), b);
 
     return mulMat4x4Float3(lightFromWorldMatrix, p);
 }
