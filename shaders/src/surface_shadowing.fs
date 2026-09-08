@@ -103,9 +103,11 @@ float ShadowSample_PCF(const mediump sampler2DArray map,
 
 highp vec2 computeTexelSizeInWorldSpace(
         const highp mat4 lightFromWorldMatrix,
-        const highp vec2 ndcShadowPosition,
+        const highp vec2 uvShadowPosition,
         const highp float w,
-        const highp vec2 ndcTexelSize) {
+        const highp vec2 uvTexelSize) {
+    // The matrix maps world positions into atlas UV coordinates, with linear light-space z.
+    // The position and texel increment must use those same UV units (not NDC).
     // This code is an optimized version of ShadowMap::texelSizeWorldSpaceAt(). Here we take advantage of
     // the fact that we know the projection matrix is directional (albeit LiSPSM), that is the projection
     // is independent of z in light space, and we only need the lengths of the vectors.
@@ -125,20 +127,20 @@ highp vec2 computeTexelSizeInWorldSpace(
     highp vec3 cross_23   = cross(ST3[2], ST3[3]);
 
     // 3. Per-pixel vectors (shadowPosition.z terms are completely gone for LiSPSM)
-    highp vec3 k0 = J_origin_0 + (ndcShadowPosition.y * cross_23);
-    highp vec3 k1 = J_origin_1 - (ndcShadowPosition.x * cross_23);
+    highp vec3 k0 = J_origin_0 + (uvShadowPosition.y * cross_23);
+    highp vec3 k1 = J_origin_1 - (uvShadowPosition.x * cross_23);
 
     // 4. Per-pixel Determinant
     highp float det_origin = dot(ST3[0], J_origin_0);
     highp float det = det_origin
-            + (ndcShadowPosition.y * dot(ST3[0], cross_23))
-            - (ndcShadowPosition.x * dot(ST3[3], J_origin_0));
+            + (uvShadowPosition.y * dot(ST3[0], cross_23))
+            - (uvShadowPosition.x * dot(ST3[3], J_origin_0));
 
     // 5. Final lengths
     highp float scale = w / abs(det);
     highp float len_J0 = length(k0) * scale;
     highp float len_J1 = length(k1) * scale;
-    return vec2(len_J0, len_J1) * ndcTexelSize;
+    return vec2(len_J0, len_J1) * uvTexelSize;
 }
 
 float chebyshevUpperBound(const highp vec2 moments, const highp float depth,
@@ -232,8 +234,7 @@ float ShadowSample_EVSSM(const bool DIRECTIONAL, const highp sampler2DArray shad
     if (DIRECTIONAL) {
         wsOneOverTexelSizeAtOneMeter = 1.0 / computeTexelSizeInWorldSpace(
                 shadowUniforms.shadows[index].lightFromWorldMatrix,
-                position.xy * 2.0 - 1.0, shadowPosition.w,
-                2.0f * texelSize);
+                position.xy, shadowPosition.w, texelSize);
     } else {
         wsOneOverTexelSizeAtOneMeter = vec2(shadowUniforms.shadows[index].wsOneOverTexelSizeAtOneMeter);
     }
