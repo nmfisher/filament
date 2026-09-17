@@ -306,6 +306,9 @@ void getPixelParams(const MaterialInputs material, out PixelParams pixel) {
 vec4 evaluateLights(const MaterialInputs material) {
     PixelParams pixel;
     getPixelParams(material, pixel);
+#if defined(VARIANT_HAS_SSS)
+    if (sssActive()) sssAlbedo = pixel.diffuseColor;
+#endif
 
     // Ideally we would keep the diffuse and specular components separate
     // until the very end but it costs more ALUs on mobile. The gains are

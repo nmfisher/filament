@@ -313,6 +313,14 @@ public:
         return mMultiSampleAntiAliasingOptions;
     }
 
+    void setSubsurfaceScatteringOptions(SubsurfaceScatteringOptions options) noexcept {
+        mSubsurfaceScatteringOptions = options;
+        mSssHistoryDirty = true;
+    }
+    bool consumeSssHistoryDirty() noexcept { return std::exchange(mSssHistoryDirty, false); }
+    SubsurfaceScatteringOptions const& getSubsurfaceScatteringOptions() const noexcept {
+        return mSubsurfaceScatteringOptions;
+    }
     void setScreenSpaceReflectionsOptions(ScreenSpaceReflectionsOptions options) noexcept;
 
     const ScreenSpaceReflectionsOptions& getScreenSpaceReflectionsOptions() const noexcept {
@@ -639,6 +647,8 @@ private:
     VignetteOptions mVignetteOptions;
     TemporalAntiAliasingOptions mTemporalAntiAliasingOptions;
     MultiSampleAntiAliasingOptions mMultiSampleAntiAliasingOptions;
+    bool mSssHistoryDirty = false;
+    SubsurfaceScatteringOptions mSubsurfaceScatteringOptions;
     ScreenSpaceReflectionsOptions mScreenSpaceReflectionsOptions;
     GuardBandOptions mGuardBandOptions;
     StereoscopicOptions mStereoscopicOptions;

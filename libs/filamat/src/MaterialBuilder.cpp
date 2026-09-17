@@ -708,6 +708,14 @@ void MaterialBuilder::prepareToBuild(MaterialInfo& info) noexcept {
         ibb.add({{ "_doubleSided", 0, UniformType::BOOL, Precision::DEFAULT, FeatureLevel::FEATURE_LEVEL_0 }});
     }
 
+    if (mMaterialDomain == MaterialDomain::SURFACE) {
+        ibb.add({{ "_sssInfo", 0, UniformType::FLOAT2, Precision::HIGH, FeatureLevel::FEATURE_LEVEL_1 }});
+        if (mShading == Shading::LIT && mBlendingMode == BlendingMode::OPAQUE &&
+                !mCustomSurfaceShading && mRefractionMode == RefractionMode::NONE) {
+            ibb.add({{ "_sssBurleyEligible", 0, UniformType::FLOAT, Precision::HIGH, FeatureLevel::FEATURE_LEVEL_1 }});
+        }
+    }
+
     mRequiredAttributes.set(POSITION);
     if (mShading != Shading::UNLIT || mShadowMultiplier) {
         mRequiredAttributes.set(TANGENTS);
