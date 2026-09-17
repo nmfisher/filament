@@ -27,7 +27,7 @@
 #include <stdint.h>
 
 namespace filament {
-static constexpr size_t VARIANT_BITS = 7;
+static constexpr size_t VARIANT_BITS = 8;
 static constexpr size_t VARIANT_COUNT = 1 << VARIANT_BITS;
 
 using VariantList = utils::bitset<uint64_t, VARIANT_COUNT / 64>;
@@ -86,7 +86,10 @@ struct Variant {
     //       Fragment SSR      1     1     1     0     0     0     0     [  -1]
     //           Reserved      1     1     1     X     0     X     0     [  -3] (exclude SSR)
     //
-    // 61 variants used (48 standard + 1 SSR + 12 depth), 67 reserved
+    // The table above describes the low seven bits. Bit 7 (SSS) adds 48
+    // color variants with diffuse/visibility MRT outputs; it is invalid on
+    // depth/SSR variants and is filtered out of vertex variants.
+    // 109 variants used (96 standard + 1 SSR + 12 depth), 147 reserved
     //
     // note: a valid variant can be neither a valid vertex nor a valid fragment variant
     //       (e.g.: FOG|SKN variants), the proper bits are filtered appropriately,
@@ -96,6 +99,7 @@ struct Variant {
 
     // when adding more bits, update RenderPass::CommandKey and RenderPass::PrimitiveInfo as needed
     // when adding more bits, update VARIANT_COUNT
+    static constexpr type_t SSS   = 0x80; // diffuse-scattering MRT, color variants only
     static constexpr type_t DIR   = 0x01; // directional light present, per frame/world position
     static constexpr type_t STE   = 0x02; // instanced stereo
     static constexpr type_t SRE   = 0x04; // receives shadows, per renderable
@@ -111,7 +115,7 @@ struct Variant {
     // special variants (variants that use the reserved space)
     static constexpr type_t SPECIAL_SSR_VARIANT= MNT | PCK | DEP;
     static constexpr type_t SPECIAL_SSR_MASK =
-        STE | MNT | PCK | DEP | SKN | SRE | DIR;
+        SSS | STE | MNT | PCK | DEP | SKN | SRE | DIR;
 
     static constexpr type_t STANDARD_MASK      = DEP;
     static constexpr type_t STANDARD_VARIANT   = 0u;
@@ -122,13 +126,15 @@ struct Variant {
     static constexpr type_t DEPTH_VARIANT      = DEP;
 
     // this mask filters out the lighting variants
-    static constexpr type_t UNLIT_MASK         = STE | SKN | FOG;
+    static constexpr type_t UNLIT_MASK         = SSS | STE | SKN | FOG;
 
     // returns raw variant bits
     bool hasDirectionalLighting() const noexcept { return key & DIR; }
     bool hasSkinningOrMorphing() const noexcept  { return key & SKN; }
     bool hasStereo() const noexcept              { return key & STE; }
 
+    bool hasSubsurfaceScattering() const noexcept { return key & SSS; }
+    void setSubsurfaceScattering(bool v) noexcept { set(v, SSS); }
     void setDirectionalLighting(bool v) noexcept { set(v, DIR); }
     void setShadowReceiver(bool v) noexcept      { set(v, SRE); }
     void setSkinning(bool v) noexcept            { set(v, SKN); }
@@ -149,7 +155,7 @@ struct Variant {
         // (MNT | PCK | DEP) + (STE | SKN)/(STE)/(SKN) are reserved.
         constexpr type_t RESERVED_MASK  = MNT | PCK | DEP | SRE | DIR;
         constexpr type_t RESERVED_VALUE = MNT | PCK | DEP;
-        return ((variant.key & DEPTH_MASK) == DEPTH_VARIANT) &&
+        return !(variant.key & SSS) && ((variant.key & DEPTH_MASK) == DEPTH_VARIANT) &&
                ((variant.key & RESERVED_MASK) != RESERVED_VALUE);
    }
 
@@ -233,7 +239,7 @@ struct Variant {
             return variant;
         }
         if ((variant.key & STANDARD_MASK) == STANDARD_VARIANT) {
-            return variant & (S2D | FOG | SRE | DIR);
+            return variant & (SSS | S2D | FOG | SRE | DIR);
         }
         if ((variant.key & DEPTH_MASK) == DEPTH_VARIANT) {
             // Only VSM & PICKING affects the fragment shader's DEPTH variant
@@ -288,6 +294,7 @@ struct Variant {
             out << name;
             first = false;
         };
+        if (variant.key & SSS) print("SSS");
         if (variant.key & STE) print("STE");
         if (variant.key & DEP) {
             if (variant.key & MNT) print("MNT");

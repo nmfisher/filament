@@ -27,6 +27,18 @@
 
 namespace filament {
 
+/** Normalized Burley diffusion with post-scatter texturing. diffusionDistance
+ * is the profile's exponential length d in world units, not Gaussian sigma or
+ * Blender's UI radius. This is not a calibrated human-skin preset. */
+struct SubsurfaceScatteringOptions {
+    bool enabled = false;
+    math::float3 diffusionDistance = { 0.0006f, 0.0003f, 0.00015f };
+    float strength = 1.0f;
+    // Diagnostic output: 0 composite, 1 diffuse, 2 coverage, 3 reversed depth.
+    uint8_t debugOutput = 0;
+};
+
+
 class Texture;
 
 /**

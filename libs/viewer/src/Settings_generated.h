@@ -35,6 +35,9 @@ int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, math::float3* v
 int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, math::float4* val);
 int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, math::double4* val);
 
+int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, SubsurfaceScatteringOptions* out);
+std::ostream& operator<<(std::ostream& out, const SubsurfaceScatteringOptions& in);
+
 int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, QualityLevel* out);
 std::ostream& operator<<(std::ostream& out, QualityLevel in);
 

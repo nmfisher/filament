@@ -151,6 +151,13 @@ const View::MultiSampleAntiAliasingOptions& View::getMultiSampleAntiAliasingOpti
     return downcast(this)->getMultiSampleAntiAliasingOptions();
 }
 
+void View::setSubsurfaceScatteringOptions(filament::SubsurfaceScatteringOptions options) noexcept {
+    downcast(this)->setSubsurfaceScatteringOptions(options);
+}
+filament::SubsurfaceScatteringOptions const& View::getSubsurfaceScatteringOptions() const noexcept {
+    return downcast(this)->getSubsurfaceScatteringOptions();
+}
+
 void View::setScreenSpaceReflectionsOptions(ScreenSpaceReflectionsOptions options) noexcept {
     downcast(this)->setScreenSpaceReflectionsOptions(options);
 }

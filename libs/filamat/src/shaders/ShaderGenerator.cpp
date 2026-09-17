@@ -79,6 +79,9 @@ void ShaderGenerator::generateSurfaceMaterialVariantDefines(io::sstream& out,
             }
             break;
         case ShaderStage::FRAGMENT:
+            if (variant.hasSubsurfaceScattering() && featureLevel >= FeatureLevel::FEATURE_LEVEL_1) {
+                CodeGenerator::generateDefine(out, "VARIANT_HAS_SSS");
+            }
             if (filament::Variant::isFogVariant(variant)) {
                 CodeGenerator::generateDefine(out, "VARIANT_HAS_FOG");
             }

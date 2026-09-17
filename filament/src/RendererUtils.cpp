@@ -63,6 +63,9 @@ RendererUtils::ColorPassOutput RendererUtils::colorPass(
         RenderPass::Executor passExecutor) noexcept {
 
     struct ColorPassData {
+        FrameGraphId<FrameGraphTexture> diffuse;
+        FrameGraphId<FrameGraphTexture> guide;
+        FrameGraphId<FrameGraphTexture> albedo;
         FrameGraphId<FrameGraphTexture> shadows;
         FrameGraphId<FrameGraphTexture> color;
         FrameGraphId<FrameGraphTexture> output;
@@ -76,7 +79,7 @@ RendererUtils::ColorPassOutput RendererUtils::colorPass(
     auto& colorPass = fg.addPass<ColorPassData>(name,
             [&](FrameGraph::Builder& builder, ColorPassData& data) {
 
-                TargetBufferFlags const clearColorFlags = config.clearFlags & TargetBufferFlags::COLOR;
+                TargetBufferFlags clearColorFlags = config.clearFlags & TargetBufferFlags::COLOR;
                 TargetBufferFlags clearDepthFlags = config.clearFlags & TargetBufferFlags::DEPTH;
                 TargetBufferFlags clearStencilFlags = config.clearFlags & TargetBufferFlags::STENCIL;
 
@@ -196,8 +199,21 @@ RendererUtils::ColorPassOutput RendererUtils::colorPass(
                  * be (the imported resource viewport is set to 'vp', see  how 'fgViewRenderTarget'
                  * is initialized in this file).
                  */
+                if (config.subsurfaceScattering) {
+                    auto desc = colorBufferDesc;
+                    desc.format = TextureFormat::RGBA16F;
+                    data.diffuse = builder.createTexture("SSS diffuse", desc);
+                    data.albedo = builder.createTexture("SSS albedo", desc);
+                    desc.format = TextureFormat::RGBA32F;
+                    data.guide = builder.createTexture("SSS visibility", desc);
+                    data.diffuse = builder.write(data.diffuse, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
+                    data.guide = builder.write(data.guide, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
+                    data.albedo = builder.write(data.albedo, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
+                    clearColorFlags |= TargetBufferFlags::COLOR1 | TargetBufferFlags::COLOR2 |
+                            TargetBufferFlags::COLOR3;
+                }
                 builder.declareRenderPass("Color Pass Target", {
-                        .attachments = { .color = { data.color, data.output },
+                        .attachments = { .color = { data.color, config.subsurfaceScattering ? data.diffuse : data.output, data.guide, data.albedo },
                         .depth = data.depth,
                         .stencil = data.stencil },
                         .clearColor = config.clearColor,
@@ -284,6 +300,9 @@ RendererUtils::ColorPassOutput RendererUtils::colorPass(
 
     return {
             .linearColor = colorPass->color,
+            .diffuse = colorPass->diffuse,
+            .guide = colorPass->guide,
+            .albedo = colorPass->albedo,
             .tonemappedColor = colorPass->output,   // can be null
             .depth = colorPass->depth
     };

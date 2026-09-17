@@ -192,6 +192,11 @@ public:
 
     const char* getParameterTransformName(std::string_view samplerName) const noexcept;
 
+    bool supportsSubsurfaceScattering() const noexcept {
+        return hasParameter("_sssBurleyEligible") && !(mDefinition.materialProperties &
+                (uint64_t(1) << uint8_t(Property::POST_LIGHTING_COLOR)));
+    }
+
     bool hasMaterialProperty(Property property) const noexcept {
         return bool(mDefinition.materialProperties & uint64_t(property));
     }

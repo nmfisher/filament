@@ -18,6 +18,7 @@
 
 #ifndef TNT_FILAMENT_VIEW_H
 #define TNT_FILAMENT_VIEW_H
+#define FILAMENT_HAS_DIFFUSE_SSS 2
 
 #include <filament/FilamentAPI.h>
 #include <filament/Options.h>
@@ -79,6 +80,7 @@ public:
 
     using DynamicResolutionOptions = filament::DynamicResolutionOptions;
     using BloomOptions = filament::BloomOptions;
+    using SubsurfaceScatteringOptions = filament::SubsurfaceScatteringOptions;
     using FogOptions = filament::FogOptions;
     using DepthOfFieldOptions = filament::DepthOfFieldOptions;
     using VignetteOptions = filament::VignetteOptions;
@@ -386,6 +388,9 @@ public:
      *
      * @param options screen-space reflections options
      */
+    void setSubsurfaceScatteringOptions(filament::SubsurfaceScatteringOptions options) noexcept;
+    filament::SubsurfaceScatteringOptions const& getSubsurfaceScatteringOptions() const noexcept;
+
     void setScreenSpaceReflectionsOptions(ScreenSpaceReflectionsOptions options) noexcept;
 
     /**

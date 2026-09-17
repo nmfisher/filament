@@ -291,6 +291,7 @@ public:
 
     //! Returns the shading model of this material.
     Shading getShading() const noexcept;
+    bool supportsSubsurfaceScattering() const noexcept;
 
     //! Returns the interpolation mode of this material. This affects how variables are interpolated.
     Interpolation getInterpolation() const noexcept;

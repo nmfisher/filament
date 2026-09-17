@@ -340,6 +340,19 @@ Java_com_google_android_filament_View_nSetSSCTOptions(JNIEnv *, jclass, jlong na
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_View_nSetSubsurfaceScatteringOptions(JNIEnv*, jclass,
+        jlong nativeView, jboolean enabled, jfloat distanceR, jfloat distanceG,
+        jfloat distanceB, jfloat strength, jint debugOutput) {
+    View* view = (View*) nativeView;
+    View::SubsurfaceScatteringOptions options;
+    options.enabled = enabled;
+    options.diffusionDistance = {distanceR, distanceG, distanceB};
+    options.strength = strength;
+    options.debugOutput = uint8_t(debugOutput);
+    view->setSubsurfaceScatteringOptions(options);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetBloomOptions(JNIEnv*, jclass,
         jlong nativeView, jlong nativeTexture,
         jfloat dirtStrength, jfloat strength, jint resolution, jint levels,
