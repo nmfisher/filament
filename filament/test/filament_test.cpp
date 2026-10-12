@@ -1984,6 +1984,75 @@ TEST(FilamentTest, FroxelData) {
     Engine::destroy((Engine **)&engine);
 }
 
+TEST(FilamentTest, OrthographicFroxelPlanesAndPointLights) {
+    using namespace filament;
+    FEngine* engine = downcast(Engine::Builder().backend(Engine::Backend::NOOP).build());
+    auto& lcm = engine->getLightManager();
+    Entity e = engine->getEntityManager().create();
+    LightManager::Builder(LightManager::Type::POINT).build(*engine, e);
+    auto li = lcm.getInstance(e);
+    float2 const spotParams = { lcm.getCosOuterSquared(li), lcm.getSinInverse(li) };
+
+    // Include an off-centre orthographic frustum, as used by shifted viewports.
+    for (float2 const origin : { float2{ 0, 0 }, float2{ 19, 3 } }) {
+        LinearAllocatorArena arena("orthographic froxel test", 3 * 1024 * 1024);
+        Froxelizer froxels(*engine);
+        float const left = origin.x - 16, right = origin.x + 16;
+        float const bottom = origin.y - 8, top = origin.y + 8;
+        auto const projection = mat4f::ortho(left, right, bottom, top, 0.1f, 100.0f);
+        froxels.setOptions(5, 100);
+        froxels.prepare(engine->getDriverApi(), arena, { 0, 0, 1280, 640 },
+                projection, 0.1f, 100.0f, { 1, 1, 0, 0 });
+        size_t const nx = froxels.getFroxelCountX(), ny = froxels.getFroxelCountY();
+        auto const lower = froxels.getFroxelAt(0, 0, 0);
+        auto const upper = froxels.getFroxelAt(nx - 1, ny - 1, 0);
+        EXPECT_EQ(lower.planes[Froxel::LEFT].xyz, float3(-1, 0, 0));
+        EXPECT_FLOAT_EQ(lower.planes[Froxel::LEFT].w, left);
+        EXPECT_FLOAT_EQ(upper.planes[Froxel::RIGHT].w, -right);
+        EXPECT_FLOAT_EQ(lower.planes[Froxel::BOTTOM].w, -bottom);
+        EXPECT_FLOAT_EQ(upper.planes[Froxel::TOP].w, top);
+
+        // Check all quadrants. The old zero-offset planes reduced an off-axis
+        // light to one row/column even though nearby tiles lay inside its sphere.
+        for (float2 const offset : { float2{ -8, -4 }, float2{ 8, -4 },
+                float2{ -8, 4 }, float2{ 8, 4 } }) {
+            float3 const position{ origin + offset, -20 };
+            constexpr float radius = 3;
+            FScene::LightSoa lights;
+            lights.push_back();
+            lights.push_back(float4{ position, radius }, position.x, position.y,
+                    position.z, radius, float3{}, float3{}, double2{}, e, spotParams,
+                    Culler::result_type(1), float2{}, FScene::ShadowInfo{});
+            froxels.froxelizeLights(*engine, {}, lights);
+            auto const& buffer = froxels.getFroxelBufferUser();
+            size_t checked = 0;
+            for (size_t z = 0; z < froxels.getFroxelCountZ(); ++z) {
+                auto const f = froxels.getFroxelAt(0, 0, z);
+                if (position.z + f.planes[Froxel::NEAR].w > 0 ||
+                        -position.z + f.planes[Froxel::FAR].w > 0) {
+                    continue;
+                }
+                for (size_t y = 0; y < ny; ++y) {
+                    for (size_t x = 0; x < nx; ++x) {
+                        float3 const sample{ left + (float(x) + .5f) * 32 / nx,
+                                bottom + (float(y) + .5f) * 16 / ny, position.z };
+                        if (length2(sample - position) < radius * radius * .9f) {
+                            EXPECT_EQ(buffer[x + nx * (y + ny * z)].count(), 1);
+                            ++checked;
+                        }
+                    }
+                }
+            }
+            EXPECT_GT(checked, 4u);
+        }
+        froxels.terminate(engine->getDriverApi());
+        arena.reset();
+    }
+    engine->destroy(e);
+    engine->getEntityManager().destroy(e);
+    Engine::destroy((Engine**)&engine);
+}
+
 TEST(FilamentTest, GoogleLineDirective) {
     {
         char s[512] = "#line 10 \"foobar\"";

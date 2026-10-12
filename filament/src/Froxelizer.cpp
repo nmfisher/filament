@@ -497,14 +497,16 @@ bool Froxelizer::update() noexcept {
         for (size_t i = 0, n = mFroxelCountX; i <= n; ++i) {
             float const x = (float(i) * froxelWidthInClipSpace) - 1.0f;
             float4 const p = trProjection * float4{ -1, 0, 0, x };
-            planesX[i] = float4{ normalize(p.xyz), 0 };  // p.w is guaranteed to be 0
+            // Orthographic slice planes have a nonzero distance from the eye.
+            // Normalize the full plane equation, retaining that offset.
+            planesX[i] = p / length(p.xyz);
         }
 
         // generate the vertical planes from their clip-space equation
         for (size_t i = 0, n = mFroxelCountY; i <= n; ++i) {
             float const y = (float(i) * froxelHeightInClipSpace) - 1.0f;
             float4 const p = trProjection * float4{ 0, 1, 0, -y };
-            planesY[i] = float4{ normalize(p.xyz), 0 };  // p.w is guaranteed to be 0
+            planesY[i] = p / length(p.xyz);
         }
 
         updateBoundingSpheres(mBoundingSpheres,
