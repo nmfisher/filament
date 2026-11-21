@@ -65,6 +65,8 @@ struct TangentsJob {
         OutputParams out;
     };
 
+    static bool needsMorphTangents(cgltf_primitive const& prim, cgltf_morph_target const& target);
+
     // Performs tangents generation synchronously. This can be invoked from inside a job if desired.
     // The parameters structure is owned by the client.
     static void run(Params* params);

@@ -25,6 +25,23 @@ using namespace filament::gltfio;
 using namespace filament;
 using namespace filament::math;
 
+bool TangentsJob::needsMorphTangents(cgltf_primitive const& prim,
+        cgltf_morph_target const& target) {
+    // The implicit glTF material is lit. As for the base mesh, generate its tangent frames
+    // only for triangle lists, since run() groups indices into triples.
+    bool const generateTangents = prim.material ? !prim.material->unlit
+                                               : prim.type == cgltf_primitive_type_triangles;
+    if (generateTangents) {
+        return true;
+    }
+    for (cgltf_size i = 0; i < target.attributes_count; ++i) {
+        if (target.attributes[i].type == cgltf_attribute_type_tangent) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // This procedure is designed to run in an isolated job.
 void TangentsJob::run(Params* params) {
     const cgltf_primitive& prim = *params->in.prim;
