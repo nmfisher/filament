@@ -1085,20 +1085,7 @@ void ResourceLoader::Impl::computeTangents(FFilamentAsset* asset) {
             const cgltf_size tcount = std::min(prim.targets_count, (cgltf_size) MAX_MORPH_TARGETS);
             for (cgltf_size tindex = 0; tindex < tcount; ++tindex) {
                 const cgltf_morph_target& target = prim.targets[tindex];
-                bool hasNormals = false;
-                for (cgltf_size aindex = 0; aindex < target.attributes_count; aindex++) {
-                    const cgltf_attribute& attribute = target.attributes[aindex];
-                    const cgltf_attribute_type atype = attribute.type;
-                    if (atype != cgltf_attribute_type_tangent) {
-                        continue;
-                    }
-                    hasNormals = true;
-                    jobParams.emplace_back(Params { { &prim, (int) tindex },
-                                                    { nullptr, tb, morphTargetOffset, (uint8_t) pindex } });
-                    break;
-                }
-                // Generate flat normals if necessary.
-                if (!hasNormals && prim.material && !prim.material->unlit) {
+                if (TangentsJob::needsMorphTangents(prim, target)) {
                     jobParams.emplace_back(Params { { &prim, (int) tindex },
                                                     { nullptr, tb, morphTargetOffset, (uint8_t) pindex } });
                 }

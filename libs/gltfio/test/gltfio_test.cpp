@@ -15,6 +15,7 @@
  */
 
 #include "GlbBuilders.h"
+#include "TangentsJob.h"
 #include "Utility.h"
 
 #include "extended/TangentsJobExtended.h"
@@ -530,6 +531,35 @@ TEST_F(glTFIOTest, MorphTargetsExceedingMaxDoNotOverflow) {
         assetLoader->destroyAsset(asset);
     }
     AssetLoader::destroy(&assetLoader);
+}
+
+TEST(glTFIOTangentsJob, DefaultMaterialNeedsMorphTangents) {
+    cgltf_attribute attributes[] = {
+        { .type = cgltf_attribute_type_position },
+        { .type = cgltf_attribute_type_normal }
+    };
+    cgltf_morph_target target{ .attributes = attributes, .attributes_count = 2 };
+    cgltf_primitive prim{ .type = cgltf_primitive_type_triangles };
+
+    // Both an omitted material and an explicit {} use the default lit material.
+    EXPECT_TRUE(TangentsJob::needsMorphTangents(prim, target));
+    cgltf_material material{};
+    prim.material = &material;
+    EXPECT_TRUE(TangentsJob::needsMorphTangents(prim, target));
+
+    target.attributes_count = 1; // POSITION only.
+    prim.material = nullptr;
+    EXPECT_TRUE(TangentsJob::needsMorphTangents(prim, target));
+    prim.type = cgltf_primitive_type_lines;
+    EXPECT_FALSE(TangentsJob::needsMorphTangents(prim, target));
+
+    prim.type = cgltf_primitive_type_triangles;
+    prim.material = &material;
+    material.unlit = true;
+    EXPECT_FALSE(TangentsJob::needsMorphTangents(prim, target));
+    target.attributes_count = 2;
+    attributes[1].type = cgltf_attribute_type_tangent;
+    EXPECT_TRUE(TangentsJob::needsMorphTangents(prim, target));
 }
 
 TEST_F(glTFIOTest, MorphTargetsExceedingMaxComputeTangents) {
