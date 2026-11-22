@@ -228,6 +228,12 @@ public:
     void fog(backend::DriverApi& driver) noexcept;
 
     // Anti-aliasing
+    FrameGraphId<FrameGraphTexture> subsurfaceScattering(FrameGraph& fg,
+            FrameGraphId<FrameGraphTexture> bypass, FrameGraphId<FrameGraphTexture> diffuse,
+            FrameGraphId<FrameGraphTexture> guide, FrameGraphId<FrameGraphTexture> albedo,
+            FrameGraphId<FrameGraphTexture> depth,
+            math::mat4f const& projection, SubsurfaceScatteringOptions const& options) noexcept;
+
     FrameGraphId<FrameGraphTexture> fxaa(FrameGraph& fg,
             FrameGraphId<FrameGraphTexture> input, Viewport const& vp,
             backend::TextureFormat outFormat, bool preserveAlphaChannel) noexcept;

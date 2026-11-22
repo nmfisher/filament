@@ -77,6 +77,7 @@ public:
         bool isAutoDepthResolveSupported;
         // Use post-process fog
         bool fogAsPostProcess;
+        bool subsurfaceScattering = false;
     };
 
     struct ColorPassInput {
@@ -90,6 +91,8 @@ public:
     };
     struct ColorPassOutput {
         FrameGraphId<FrameGraphTexture> linearColor;
+        FrameGraphId<FrameGraphTexture> guide;
+        FrameGraphId<FrameGraphTexture> albedo;
         FrameGraphId<FrameGraphTexture> tonemappedColor;
         FrameGraphId<FrameGraphTexture> depth;
     };

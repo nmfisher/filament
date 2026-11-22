@@ -1,4 +1,9 @@
-#if !defined(HAS_CUSTOM_OUTPUT)
+#if defined(VARIANT_HAS_SSS) && !defined(HAS_CUSTOM_OUTPUT)
+vec4 fragColor;
+layout(location = 0) out vec4 sssDiffuseOutput;
+layout(location = 1) out highp vec4 sssGuideOutput;
+layout(location = 2) out vec4 sssAlbedoOutput;
+#elif !defined(HAS_CUSTOM_OUTPUT)
 layout(location = 0) out vec4 fragColor;
 #else
 // Define fragColor even with custom outputs enabled to satisfy usages. It will be removed
@@ -59,6 +64,18 @@ void main() {
     applyAlphaMask(inputs.baseColor);
 
     fragColor = evaluateMaterial(inputs);
+#if defined(VARIANT_HAS_SSS) && !defined(HAS_CUSTOM_OUTPUT)
+    sssDiffuseOutput = vec4(sssDiffuse, sssActive() ? materialParams._sssInfo.x : 0.0);
+    sssGuideOutput = vec4(0.0);
+    sssAlbedoOutput = vec4(sssAlbedo, 1.0);
+#if defined(SHADING_MODEL_LIT)
+    if (sssActive()) {
+        vec3 n = normalize(mat3(getViewFromWorldMatrix()) * getWorldGeometricNormalVector());
+        // Negative IDs distinguish geometry from any legal clear color alpha.
+        sssGuideOutput = vec4(n, -materialParams._sssInfo.y);
+    }
+#endif
+#endif
 
 #if defined(MATERIAL_HAS_POST_LIGHTING_COLOR) && !defined(MATERIAL_HAS_REFLECTIONS)
     blendPostLightingColor(inputs, fragColor);

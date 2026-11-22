@@ -79,3 +79,16 @@ void prepareMaterial(const MaterialInputs material) {
 #endif
 #endif
 }
+
+// Diffuse is accumulated separately only in the MRT color variant.
+#if defined(VARIANT_HAS_SSS)
+vec3 sssDiffuse = vec3(0.0);
+vec3 sssAlbedo = vec3(0.0);
+bool sssActive() {
+#if defined(SHADING_MODEL_LIT) && defined(BLEND_MODE_OPAQUE) && !defined(MATERIAL_HAS_CUSTOM_SURFACE_SHADING) && !defined(MATERIAL_HAS_POST_LIGHTING_COLOR)
+    return materialParams._sssInfo.x > 0.0;
+#else
+    return false;
+#endif
+}
+#endif

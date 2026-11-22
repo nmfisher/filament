@@ -18,6 +18,7 @@
 
 #ifndef TNT_FILAMENT_VIEW_H
 #define TNT_FILAMENT_VIEW_H
+#define FILAMENT_HAS_DIFFUSE_SSS 2
 
 #include <filament/FilamentAPI.h>
 #include <filament/Options.h>
@@ -79,6 +80,7 @@ public:
 
     using DynamicResolutionOptions = filament::DynamicResolutionOptions;
     using BloomOptions = filament::BloomOptions;
+    using SubsurfaceScatteringOptions = filament::SubsurfaceScatteringOptions;
     using FogOptions = filament::FogOptions;
     using DepthOfFieldOptions = filament::DepthOfFieldOptions;
     using VignetteOptions = filament::VignetteOptions;
@@ -424,6 +426,10 @@ public:
      * @return multi-sample antialiasing options
      */
     MultiSampleAntiAliasingOptions const& getMultiSampleAntiAliasingOptions() const noexcept;
+
+    /** Sets opaque screen-space diffuse lighting options. */
+    void setSubsurfaceScatteringOptions(filament::SubsurfaceScatteringOptions options) noexcept;
+    filament::SubsurfaceScatteringOptions const& getSubsurfaceScatteringOptions() const noexcept;
 
     /**
      * Sets this View's color grading transforms.

@@ -820,7 +820,16 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
 
     // Conditions to meet to be able to use the sub-pass rendering path. This is regardless of
     // whether the backend supports subpasses (or if they are disabled in the debugRegistry).
-    const bool isSubpassPossible =
+    if (view.consumeSssHistoryDirty()) view.clearFrameHistory(engine);
+    const auto sssOptions = view.getSubsurfaceScatteringOptions();
+    const bool hasSSS = sssOptions.enabled && (sssOptions.strength > 0 || sssOptions.debugOutput != 0);
+    FILAMENT_CHECK_PRECONDITION(!hasSSS || (msaaSampleCount <= 1 && !view.hasFog() &&
+            !view.hasStereo() && !ssReflectionsOptions.enabled &&
+            mFeatureLevel >= FeatureLevel::FEATURE_LEVEL_1 &&
+            driver.getMaxDrawBuffers() >= 3 &&
+            driver.isRenderTargetFormatSupported(TextureFormat::RGBA32F)))
+            << "Opaque SSS requires single-sample, non-stereo rendering without fog or SSR";
+    const bool isSubpassPossible = !hasSSS &&
              msaaSampleCount <= 1 &&
              hasColorGrading &&
              !bloomOptions.enabled && !dofOptions.enabled && !taaOptions.enabled;
@@ -1104,7 +1113,10 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
             .keepOverrideEnd = keepOverrideEndFlags
     }, viewRenderTarget);
 
-    const TextureFormat hdrFormat = getHdrFormat(view, needsAlphaChannel);
+    // Without post-processing, the usual color pass writes straight to the
+    // destination. Keep a high-precision intermediate when SSS needs to sample it.
+    const TextureFormat hdrFormat = hasSSS && !hasPostProcess
+            ? TextureFormat::RGBA16F : getHdrFormat(view, needsAlphaChannel);
 
     // the clearFlags and clearColor specified below will only apply when rendering into the
     // temporary color buffer. In particular, they won't apply when rendering into the main
@@ -1337,6 +1349,14 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
 
     // create the pass, which generates all its commands (this is a heavy operation)
     RenderPass const pass{ passBuilder.build(engine, driver) };
+    // Keep the ordinary shader variant for the scene color. The MRT variant
+    // changed derivative-based specular AA on Metal, even with no materials selected.
+    std::optional<RenderPass> diffusionPass;
+    if (hasSSS) {
+        auto diffusionVariant = variant;
+        diffusionVariant.setSubsurfaceScattering(true);
+        diffusionPass.emplace(passBuilder.variant(diffusionVariant).build(engine, driver));
+    }
 
     // now that we have the commands we can figure out if we have refraction commands
     auto* const firstRefractionCommand = [&view](RenderPass const& pass) {
@@ -1348,6 +1368,8 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
     }(pass);
 
     hasScreenSpaceRefraction = firstRefractionCommand != nullptr;
+    FILAMENT_CHECK_PRECONDITION(!hasSSS || !hasScreenSpaceRefraction)
+            << "Opaque SSS does not support screen-space refraction";
 
     // this makes the viewport relative to xvp
     // FIXME: we should use 'vp' when rendering directly into the swapchain, but that's hard to
@@ -1355,7 +1377,7 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
     // FIXME: we probably should take the dynamic scaling into account too
     // if MSAA is enabled, we end-up rendering in an intermediate buffer. This is the only case where
     // "!hasPostProcess" doesn't guarantee rendering into the swapchain.
-    const bool useIntermediateBuffer = hasPostProcess || msaaOptions.enabled ||
+    const bool useIntermediateBuffer = hasSSS || hasPostProcess || msaaOptions.enabled ||
             ssReflectionsOptions.enabled || hasScreenSpaceRefraction ||
             (isRenderingMultiview && engine.debug.stereo.
             combine_multiview_images);
@@ -1367,13 +1389,14 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
     const_cast<RenderPass&>(pass).finalize(engine, driver);
 
     // the color pass itself + color-grading as subpass if needed
-    auto colorPassOutput = RendererUtils::colorPass(fg, "Color Pass", mEngine, view, {
-                .shadows = blackboard.get<FrameGraphTexture>("shadows"),
-                .ssao = blackboard.get<FrameGraphTexture>("ssao"),
-                .ssr = ssrConfig.ssr,
-                .structure = structure
-            },
-            colorBufferDesc, config, colorGradingConfigForColor, pass.getExecutor());
+    const RendererUtils::ColorPassInput colorPassInput{
+            .shadows = blackboard.get<FrameGraphTexture>("shadows"),
+            .ssao = blackboard.get<FrameGraphTexture>("ssao"),
+            .ssr = ssrConfig.ssr,
+            .structure = structure,
+    };
+    auto colorPassOutput = RendererUtils::colorPass(fg, "Color Pass", mEngine, view,
+            colorPassInput, colorBufferDesc, config, colorGradingConfigForColor, pass.getExecutor());
 
     if (UTILS_UNLIKELY(hasScreenSpaceRefraction)) {
         // This cancels the colorPass() call above if refraction is active.
@@ -1395,6 +1418,19 @@ void FRenderer::renderJob(DriverApi& driver, LinearAllocatorArena& arena, FView&
         //       subpass) here because it's more convenient.
         colorPassOutput.linearColor =
                 ppm.customResolveUncompressPass(fg, colorPassOutput.linearColor);
+    }
+
+    if (diffusionPass) {
+        diffusionPass->setScissorViewport(xvp);
+        diffusionPass->finalize(engine, driver);
+        auto diffusionConfig = config;
+        diffusionConfig.subsurfaceScattering = true;
+        auto const lighting = RendererUtils::colorPass(fg, "SSS lighting", mEngine, view,
+                colorPassInput, colorBufferDesc, diffusionConfig, colorGradingConfigForColor,
+                diffusionPass->getExecutor());
+        colorPassOutput.linearColor = ppm.subsurfaceScattering(fg,
+                colorPassOutput.linearColor, lighting.linearColor, lighting.guide,
+                lighting.albedo, lighting.depth, cameraInfo.projection, sssOptions);
     }
 
     // export the color buffer if screen-space reflections are enabled

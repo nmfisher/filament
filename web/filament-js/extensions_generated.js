@@ -2,6 +2,16 @@
 
 Filament.loadGeneratedExtensions = function() {
 
+    Filament.View.prototype.setSubsurfaceScatteringOptionsDefaults = function(overrides) {
+        const options = {
+            enabled: false,
+            diffusionDistance: [ 0.0006, 0.0003, 0.00015 ],
+            strength: 1.0,
+            debugOutput: 0,
+        };
+        return Object.assign(options, overrides);
+    };
+
     Filament.View.prototype.setDynamicResolutionOptionsDefaults = function(overrides) {
         const options = {
             minScale: [0.5, 0.5],

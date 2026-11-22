@@ -428,6 +428,9 @@ void RenderPass::setupColorCommand(Command& cmdDraw, Variant variant, DynamicSpe
     bool const isBlendingCommand = !hasScreenSpaceRefraction &&
             (blendingMode != BlendingMode::OPAQUE && blendingMode != BlendingMode::MASKED);
 
+    FILAMENT_CHECK_PRECONDITION(!variant.hasSubsurfaceScattering() ||
+            (!isBlendingCommand && !hasScreenSpaceRefraction))
+            << "Opaque SSS does not support transparent or refractive scene materials";
     RasterState rasterState = mi->getRasterState();
 
     uint64_t keyDraw = cmdDraw.key;

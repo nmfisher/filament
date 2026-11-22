@@ -42,6 +42,10 @@ const char* Material::getName() const noexcept {
     return downcast(this)->getName().c_str_safe();
 }
 
+bool Material::supportsSubsurfaceScattering() const noexcept {
+    return downcast(this)->supportsSubsurfaceScattering();
+}
+
 Shading Material::getShading()  const noexcept {
     return downcast(this)->getShading();
 }
