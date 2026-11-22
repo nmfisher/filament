@@ -314,6 +314,7 @@ static const PostProcessManager::StaticMaterialInfo sMaterialList[] = {
         { "separableGaussianBlur4L",    MATERIAL(MATERIALS, SEPARABLEGAUSSIANBLUR),
                 { {"arraySampler", true }, {"componentCount", 4} } },
         { "debugShadowCascades",        MATERIAL(MATERIALS, DEBUGSHADOWCASCADES) },
+        { "subsurfaceScattering", MATERIAL(MATERIALS, SUBSURFACESCATTERING) },
         { "resolveDepth",               MATERIAL(MATERIALS, RESOLVEDEPTH) },
         { "shadowmap",                  MATERIAL(MATERIALS, SHADOWMAP) },
 };
@@ -2850,6 +2851,48 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::colorGrading(FrameGraph& fg,
     );
 
     return ppColorGrading->output;
+}
+
+FrameGraphId<FrameGraphTexture> PostProcessManager::subsurfaceScattering(FrameGraph& fg,
+        FrameGraphId<FrameGraphTexture> bypass, FrameGraphId<FrameGraphTexture> diffuse,
+        FrameGraphId<FrameGraphTexture> guide, FrameGraphId<FrameGraphTexture> albedo,
+        FrameGraphId<FrameGraphTexture> depth,
+        mat4f const& projection, SubsurfaceScatteringOptions const& options) noexcept {
+    struct Data {
+        FrameGraphId<FrameGraphTexture> bypass, diffuse, guide, albedo, depth, output;
+    };
+    auto const& pass = fg.addPass<Data>("Opaque diffuse SSS",
+            [&](FrameGraph::Builder& builder, auto& data) {
+                data.bypass = builder.sample(bypass);
+                data.diffuse = builder.sample(diffuse);
+                data.guide = builder.sample(guide);
+                data.albedo = builder.sample(albedo);
+                data.depth = builder.sample(depth);
+                auto desc = builder.getDescriptor(bypass);
+                desc.format = TextureFormat::RGBA16F;
+                data.output = builder.createTexture("SSS recombined HDR", desc);
+                data.output = builder.declareRenderPass(data.output);
+            },
+            [=, this](FrameGraphResources const& resources, auto const& data, DriverApi& driver) {
+                bindPostProcessDescriptorSet(driver);
+                bindPerRenderableDescriptorSet(driver);
+                auto const& material = getPostProcessMaterial("subsurfaceScattering");
+                constexpr auto variant = PostProcessVariant::TRANSLUCENT;
+                auto* mi = getMaterialInstance(mEngine, driver, material, variant);
+                mi->setParameter("bypass", resources.getTexture(data.bypass), {});
+                mi->setParameter("diffuse", resources.getTexture(data.diffuse), {});
+                mi->setParameter("guide", resources.getTexture(data.guide), {});
+                mi->setParameter("albedo", resources.getTexture(data.albedo), {});
+                mi->setParameter("depth", resources.getTexture(data.depth), {});
+                mi->setParameter("inverseProjection", inverse(projection));
+                mi->setParameter("projection", projection);
+                mi->setParameter("diffusionDistance", options.diffusionDistance);
+                mi->setParameter("strength", options.strength);
+                mi->setParameter("debugOutput", int32_t(options.debugOutput));
+                commitAndRenderFullScreenQuad(driver, resources.getRenderPassInfo(), mi, variant);
+                unbindAllDescriptorSets(driver);
+            });
+    return pass->output;
 }
 
 FrameGraphId<FrameGraphTexture> PostProcessManager::fxaa(FrameGraph& fg,

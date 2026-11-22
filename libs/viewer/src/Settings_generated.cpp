@@ -167,6 +167,41 @@ int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, math::double4* 
     return i;
 }
 
+int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, SubsurfaceScatteringOptions* out) {
+    CHECK_TOKTYPE(tokens[i], JSMN_OBJECT);
+    int size = tokens[i++].size;
+    for (int j = 0; j < size; ++j) {
+        const jsmntok_t tok = tokens[i];
+        CHECK_KEY(tok);
+        if (compare(tok, jsonChunk, "enabled") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->enabled);
+        } else if (compare(tok, jsonChunk, "diffusionDistance") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->diffusionDistance);
+        } else if (compare(tok, jsonChunk, "strength") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->strength);
+        } else if (compare(tok, jsonChunk, "debugOutput") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->debugOutput);
+        } else {
+            slog.w << "Invalid SubsurfaceScatteringOptions key: '" << STR(tok, jsonChunk) << "'" << io::endl;
+            i = parse(tokens, i + 1);
+        }
+        if (i < 0) {
+            slog.e << "Invalid SubsurfaceScatteringOptions value: '" << STR(tok, jsonChunk) << "'" << io::endl;
+            return i;
+        }
+    }
+    return i;
+}
+
+std::ostream& operator<<(std::ostream& out, const SubsurfaceScatteringOptions& in) {
+    return out << "{\n"
+        << "\"enabled\": " << to_string(in.enabled) << ",\n"
+        << "\"diffusionDistance\": " << (in.diffusionDistance) << ",\n"
+        << "\"strength\": " << (in.strength) << ",\n"
+        << "\"debugOutput\": " << int(in.debugOutput) << "\n"
+        << "}";
+}
+
 int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, QualityLevel* out) {
     if (0 == compare(tokens[i], jsonChunk, "LOW")) { *out = QualityLevel::LOW; }
     else if (0 == compare(tokens[i], jsonChunk, "MEDIUM")) { *out = QualityLevel::MEDIUM; }

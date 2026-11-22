@@ -354,6 +354,12 @@ Filament.loadClassExtensions = function() {
         this._setScreenSpaceReflectionsOptions(options);
     };
 
+    /// setSubsurfaceScatteringOptions ::method::
+    Filament.View.prototype.setSubsurfaceScatteringOptions = function(overrides) {
+        const options = this.setSubsurfaceScatteringOptionsDefaults(overrides);
+        this._setSubsurfaceScatteringOptions(options);
+    };
+
     /// setBloomOptions ::method::
     Filament.View.prototype.setBloomOptions = function(overrides) {
         const options = this.setBloomOptionsDefaults(overrides);

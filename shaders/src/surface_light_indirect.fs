@@ -803,6 +803,16 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     vec3 diffuseIrradiance = isEvaluateDiffuseIBL(pixel, diffuseNormal, shading_view);
 #endif
     vec3 Fd = pixel.diffuseColor * diffuseIrradiance * (1.0 - E) * diffuseBRDF;
+#if defined(VARIANT_HAS_SSS)
+    if (sssActive()) {
+        vec3 sssFd = diffuseIrradiance * (1.0 - E) * diffuseBRDF;
+        vec3 unusedFr = vec3(0.0);
+        multiBounceAO(diffuseAO, pixel.diffuseColor, sssFd);
+        evaluateSheenIBL(pixel, diffuseAO, interpolationCache, sssFd, unusedFr);
+        evaluateClearCoatIBL(pixel, diffuseAO, interpolationCache, sssFd, unusedFr);
+        sssDiffuse += sssFd * frameUniforms.iblLuminance;
+    }
+#endif
 
     // subsurface layer
     evaluateSubsurfaceIBL(pixel, diffuseIrradiance, Fd, Fr);

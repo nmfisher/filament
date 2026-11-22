@@ -1,0 +1,112 @@
+material {
+    name : subsurfaceScattering,
+    domain : postprocess,
+    depthWrite : false,
+    depthCulling : false,
+    variables : [ vertex ],
+    parameters : [
+        { type : sampler2d, name : bypass, precision : high },
+        { type : sampler2d, name : diffuse, precision : high },
+        { type : sampler2d, name : guide, precision : high },
+        { type : sampler2d, name : albedo, precision : high },
+        { type : sampler2d, name : depth, format : float, precision : high },
+        { type : mat4, name : inverseProjection, precision : high },
+        { type : mat4, name : projection, precision : high },
+        { type : float3, name : diffusionDistance, precision : high },
+        { type : float, name : strength },
+        { type : int, name : debugOutput }
+    ]
+}
+
+vertex {
+    void postProcessVertex(inout PostProcessVertexInputs p) {
+        p.vertex.xy = uvToRenderTargetUV(p.normalizedUV);
+    }
+}
+
+fragment {
+    // Christensen-Burley normalized diffusion, in area measure:
+    // R(r) = (exp(-r/d) + exp(-r/(3d))) / (8*pi*d*r).
+    // Its radial CDF is 1 - .25*exp(-r/d) - .75*exp(-r/(3d)).
+    // Match Cycles' 16d truncation and normalize the retained 0.996379 mass.
+    // Albedo is applied only at the receiving pixel, after diffusion.
+    highp vec3 cellWeight(vec2 offset, vec2 unitsPerPixel, highp vec3 d) {
+        // 3x3 Gauss-Legendre integration of a noncentral pixel footprint.
+        // The singular center is never evaluated: its mass is implicit in
+        // the center + weighted-differences accumulation below.
+        const float nodes[3] = float[3](-0.3872983346207417, 0.0, 0.3872983346207417);
+        const float weights[3] = float[3](0.2777777777777778, 0.4444444444444444, 0.2777777777777778);
+        vec3 mass = vec3(0.0);
+        for (int j = 0; j < 3; ++j) {
+            for (int i = 0; i < 3; ++i) {
+                float r = length((offset + vec2(nodes[i], nodes[j])) * unitsPerPixel);
+                vec3 e = exp(-r / (3.0 * d));
+                vec3 density = (e + e*e*e) / (25.132741228718345 * d * r);
+                density *= vec3(lessThan(vec3(r), 16.0 * d));
+                mass += weights[i] * weights[j] * density;
+            }
+        }
+        return mass * (unitsPerPixel.x * unitsPerPixel.y / 0.9963790093708328);
+    }
+
+    highp vec3 positionAt(ivec2 pixel, ivec2 size) {
+        vec2 uv = uvToRenderTargetUV((vec2(pixel) + 0.5) / vec2(size));
+        float d = texelFetch(materialParams_depth, pixel, 0).r;
+        // CameraInfo.projection already uses Filament's reversed [0, 1] clip depth.
+        // Converting the sampled depth back to GL here would apply the remap twice.
+        vec4 p = materialParams.inverseProjection * vec4(uv * 2.0 - 1.0, d, 1.0);
+        return p.xyz / p.w;
+    }
+
+    void postProcess(inout PostProcessInputs postProcess) {
+        ivec2 size = textureSize(materialParams_diffuse, 0);
+        ivec2 pixel = clamp(ivec2(variable_vertex.xy * vec2(size)),
+                ivec2(0), size - 1);
+        vec4 b = texelFetch(materialParams_bypass, pixel, 0);
+        vec4 d = texelFetch(materialParams_diffuse, pixel, 0);
+        vec4 g = texelFetch(materialParams_guide, pixel, 0);
+        vec3 albedo = texelFetch(materialParams_albedo, pixel, 0).rgb;
+        bool participates = g.w < 0.0 && d.a > 0.0;
+        if (materialParams.debugOutput == 1) {
+            postProcess.color = vec4(participates ? albedo * d.rgb : vec3(0.0), 1.0);
+            return;
+        }
+        if (materialParams.debugOutput == 2) {
+            postProcess.color = vec4(vec3(participates ? 1.0 : 0.0), 1.0);
+            return;
+        }
+        if (materialParams.debugOutput == 3) {
+            postProcess.color = vec4(vec3(texelFetch(materialParams_depth, pixel, 0).r), 1.0);
+            return;
+        }
+        if (!participates) {
+            postProcess.color = b;
+            return;
+        }
+        vec3 p = positionAt(pixel, size);
+        float clipW = abs((materialParams.projection * vec4(p, 1.0)).w);
+        vec2 scale = abs(vec2(materialParams.projection[0][0], materialParams.projection[1][1]))
+                * vec2(size) / (2.0 * max(clipW, 0.00001));
+        vec3 distance = materialParams.diffusionDistance;
+        // Explicit finite reference support. Omitted tail mass stays at center.
+        int radius = int(min(32.0, ceil(16.0 * max3(distance) * max(scale.x, scale.y))));
+        float normalDistance = max(0.000001, max3(distance));
+        vec3 delta = vec3(0.0);
+        for (int y = -radius; y <= radius; ++y) {
+            for (int x = -radius; x <= radius; ++x) {
+                if (x == 0 && y == 0) continue;
+                ivec2 q = pixel + ivec2(x, y);
+                if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, size))) continue;
+                vec4 other = texelFetch(materialParams_guide, q, 0);
+                if (other.w != g.w || dot(other.xyz, g.xyz) < 0.5) continue;
+                vec3 offset = positionAt(q, size) - p;
+                if (max(abs(dot(offset, g.xyz)), abs(dot(offset, other.xyz))) > normalDistance) continue;
+                vec3 w = cellWeight(vec2(x, y), 1.0 / scale, distance);
+                delta += w * (texelFetch(materialParams_diffuse, q, 0).rgb - d.rgb);
+            }
+        }
+        // Preserve the original shaded color and add only a diffuse-lighting
+        // correction. Specular and emission are never subtracted/reconstructed.
+        postProcess.color = vec4(b.rgb + albedo * materialParams.strength * d.a * delta, b.a);
+    }
+}

@@ -10,6 +10,13 @@ using namespace filament;
 
 EMSCRIPTEN_BINDINGS(jsbindings_generated) {
 
+value_object<View::SubsurfaceScatteringOptions>("View$SubsurfaceScatteringOptions")
+    .field("enabled", &View::SubsurfaceScatteringOptions::enabled)
+    .field("diffusionDistance", &View::SubsurfaceScatteringOptions::diffusionDistance)
+    .field("strength", &View::SubsurfaceScatteringOptions::strength)
+    .field("debugOutput", &View::SubsurfaceScatteringOptions::debugOutput)
+    ;
+
 value_object<View::DynamicResolutionOptions>("View$DynamicResolutionOptions")
     .field("minScale", &View::DynamicResolutionOptions::minScale)
     .field("maxScale", &View::DynamicResolutionOptions::maxScale)

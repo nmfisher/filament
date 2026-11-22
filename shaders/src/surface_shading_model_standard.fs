@@ -129,6 +129,11 @@ vec3 surfaceShading(const PixelParams pixel, const Light light, float occlusion)
 #endif
 
     vec3 Fd = diffuseLobe(pixel, NoV, NoL, LoH);
+#if defined(VARIANT_HAS_SSS)
+    // Accumulate lighting independently; preserve the ordinary color path.
+    // Dividing Fd by albedo would lose lighting in black texture channels.
+    vec3 sssFd = vec3(diffuse(pixel.roughness, NoV, NoL, LoH));
+#endif
 #if defined(MATERIAL_HAS_REFRACTION)
     Fd *= (1.0 - pixel.transmission);
 #endif
@@ -145,6 +150,9 @@ vec3 surfaceShading(const PixelParams pixel, const Light light, float occlusion)
 
 #if defined(MATERIAL_HAS_SHEEN_COLOR)
     color *= pixel.sheenScaling;
+#if defined(VARIANT_HAS_SSS)
+    sssFd *= pixel.sheenScaling;
+#endif
     color += sheenLobe(pixel, NoV, NoL, NoH);
 #endif
 
@@ -155,19 +163,33 @@ vec3 surfaceShading(const PixelParams pixel, const Light light, float occlusion)
 
 #if defined(MATERIAL_HAS_NORMAL) || defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
     color *= attenuation * NoL;
+#if defined(VARIANT_HAS_SSS)
+    sssFd *= attenuation;
+#endif
 
     // If the material has a normal map, we want to use the geometric normal
     // instead to avoid applying the normal map details to the clear coat layer
     float clearCoatNoL = saturate(dot(shading_clearCoatNormal, light.l));
     color += clearCoat * clearCoatNoL;
 
+#if defined(VARIANT_HAS_SSS)
+    if (sssActive()) sssDiffuse += (sssFd * light.colorIntensity.rgb) *
+            (light.colorIntensity.w * light.attenuation * NoL * occlusion);
+#endif
     // Early exit to avoid the extra multiplication by NoL
     return (color * light.colorIntensity.rgb) *
             (light.colorIntensity.w * light.attenuation * occlusion);
 #else
     color *= attenuation;
+#if defined(VARIANT_HAS_SSS)
+    sssFd *= attenuation;
+#endif
     color += clearCoat;
 #endif
+#endif
+#if defined(VARIANT_HAS_SSS)
+    if (sssActive()) sssDiffuse += (sssFd * light.colorIntensity.rgb) *
+            (light.colorIntensity.w * light.attenuation * NoL * occlusion);
 #endif
     return (color * light.colorIntensity.rgb) *
             (light.colorIntensity.w * light.attenuation * NoL * occlusion);
